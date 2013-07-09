@@ -30,7 +30,7 @@ Now run the script as below:
 
     $ hetzner-robot-dns.pl -u <hetzner_user> -p <hetzner_password> -d <domain_id>
 
-Don't forget to replace **<hetzner_user>** and **<hetzner_password>** accordingly.
+Don't forget to replace **&lt;hetzner_user&gt;** and **&lt;hetzner_password&gt;** accordingly.
 You can prefer not to specify your password on the command line - then run script like this:
 
     $ hetzner-robot-dns.pl -u <hetzner_user> -p -d <domain_id>
