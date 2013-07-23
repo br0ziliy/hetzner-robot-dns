@@ -12,6 +12,7 @@ use LWP::UserAgent;
 use Getopt::Long;
 use URI::Escape;
 use Term::ReadKey;
+use Crypt::SSLeay;
 
 # Initialize /browser/
 my $lwp = LWP::UserAgent->new();
