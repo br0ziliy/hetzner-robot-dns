@@ -13,6 +13,7 @@ use Getopt::Long;
 use URI::Escape;
 use Term::ReadKey;
 use Crypt::SSLeay;
+use HTML::Entities;
 
 # Initialize /browser/
 my $lwp = LWP::UserAgent->new();
@@ -96,7 +97,8 @@ sub getzone {
 
 	# TODO: Potentially unsafe regexp - but what can we do ...
 	$html =~ m/.*(\$TTL[^<]+)<\/te/;
-	my @zone = $1;
+	# decode_entities() is exported from HTML::Entities
+	my @zone = decode_entities($1);
 	return @zone;
 }
 
