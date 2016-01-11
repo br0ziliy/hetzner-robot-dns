@@ -83,6 +83,18 @@ sub login {
 	}
 }
 
+sub getcsrf {
+       my $url = shift;
+       my $r = $lwp->post ($url);
+       #print "DEBUG: ".$r->content."\n";
+       if ($r->content =~ /name="_csrf_token"\s+value="([a-f0-9]+)"/) {
+               #print "DEBUG: CSRF token - " . $1;
+               return $1;
+       } else {
+               mydie("CSRF token not found, exiting.");
+       }
+}
+
 sub getzone {
 	my ($zoneid) = @_;
 
@@ -115,10 +127,12 @@ sub setzone {
 
 	# X- headers should be there probably - without these guys
 	# Hetzner just ignore the POST request.
+    my $csrf = getcsrf($hetzner."/dns/update/id/".$id);
 	my $r = $lwp->post ( $hetzner."/dns/update",
 		[
 			'id' => $id,
 			'zonefile' => $zoneescaped,
+            '_csrf_token' => $csrf,
 		],
 		"Content-Type" => 'application/x-www-form-urlencoded; charset=UTF-8',
 		Referrer => $hetzner."/dns",
