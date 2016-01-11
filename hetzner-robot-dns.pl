@@ -40,47 +40,47 @@ getpass() unless ($pass);
 $0 = "hetzner-robot-dns.pl";
 
 sub mydie {
-	my ($mess) = @_;
-	print STDERR "ERROR: " . $mess . "\n";
-	exit 2;
+    my ($mess) = @_;
+    print STDERR "ERROR: " . $mess . "\n";
+    exit 2;
 }
 
 sub getpass {
-	ReadMode ('noecho');
-	print "Enter Password: ";
-	chomp($pass = <STDIN>);
-	ReadMode ('restore');
-	print "\n";
+    ReadMode ('noecho');
+    print "Enter Password: ";
+    chomp($pass = <STDIN>);
+    ReadMode ('restore');
+    print "\n";
 }
 
 sub login {
-	# Extra-check, but I want to be extra-cautious.
-	if (!$user || !$pass) {
-		mydie("Username and password required!");
-	}
-	#print "DEBUG: $user $pass \n";
+    # Extra-check, but I want to be extra-cautious.
+    if (!$user || !$pass) {
+        mydie("Username and password required!");
+    }
+    #print "DEBUG: $user $pass \n";
 
-	# Cookie header - is just some MD5 hash, could be anything at the 
-	# beginning. Looks like Hetzner expect this cookie to be always set...
-	my $r = $lwp->post( $hetzner."/login/check",
-	        [
-	        'user' => $user,
-	        'password' => $pass,
-	        ],
-	        'Referer' => $hetzner."/login",
-	        'Cookie' => "robot=2006fe366a925c478835fbfae197fc75",
-	);
-	undef $pass;
-	#print "DEBUG: ".$r->code."\n";
-	#print "DEBUG: ".$r->header('Location')."\n";
+    # Cookie header - is just some MD5 hash, could be anything at the 
+    # beginning. Looks like Hetzner expect this cookie to be always set...
+    my $r = $lwp->post( $hetzner."/login/check",
+            [
+            'user' => $user,
+            'password' => $pass,
+            ],
+            'Referer' => $hetzner."/login",
+            'Cookie' => "robot=2006fe366a925c478835fbfae197fc75",
+    );
+    undef $pass;
+    #print "DEBUG: ".$r->code."\n";
+    #print "DEBUG: ".$r->header('Location')."\n";
 
-	# TODO: Potentially unsafe - but I don't know other method to realibly detect
-	# a successful login.
-	if ($r->code != 302 && $r->header('Location') ne 'https://robot.your-server.de/') {
-		return 1;
-	} else {
-		return 0;
-	}
+    # TODO: Potentially unsafe - but I don't know other method to realibly detect
+    # a successful login.
+    if ($r->code != 302 && $r->header('Location') ne 'https://robot.your-server.de/') {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 sub getcsrf {
@@ -96,71 +96,71 @@ sub getcsrf {
 }
 
 sub getzone {
-	my ($zoneid) = @_;
+    my ($zoneid) = @_;
 
-	# Another extra-check - should never happen.
-	if (!$zoneid) {
-		mydie("Zone ID is required!");
-	}
-	my $r = $lwp->post( $hetzner."/dns/update/id/".$zoneid,
-		[],
-		Referrer => $hetzner."/dns");
-	my $html = $r->content;
+    # Another extra-check - should never happen.
+    if (!$zoneid) {
+        mydie("Zone ID is required!");
+    }
+    my $r = $lwp->post( $hetzner."/dns/update/id/".$zoneid,
+        [],
+        Referrer => $hetzner."/dns");
+    my $html = $r->content;
 
-	# TODO: Potentially unsafe regexp - but what can we do ...
-	$html =~ m/.*(\$TTL[^<]+)<\/te/;
-	# decode_entities() is exported from HTML::Entities
-	my @zone = decode_entities($1);
-	return @zone;
+    # TODO: Potentially unsafe regexp - but what can we do ...
+    $html =~ m/.*(\$TTL[^<]+)<\/te/;
+    # decode_entities() is exported from HTML::Entities
+    my @zone = decode_entities($1);
+    return @zone;
 }
 
 sub setzone {
-	my ( $id, @zone ) = @_;
+    my ( $id, @zone ) = @_;
 
-	# TODO: check zone file @zone for sanity?
+    # TODO: check zone file @zone for sanity?
 
-	# One more extra-check - see, I'm cautious :)
-	if (!@zone || !$id) {
-		mydie("Zone ID is required!");
-	}
-	my $zoneescaped = join("",@zone);
+    # One more extra-check - see, I'm cautious :)
+    if (!@zone || !$id) {
+        mydie("Zone ID is required!");
+    }
+    my $zoneescaped = join("",@zone);
 
-	# X- headers should be there probably - without these guys
-	# Hetzner just ignore the POST request.
+    # X- headers should be there probably - without these guys
+    # Hetzner just ignore the POST request.
     my $csrf = getcsrf($hetzner."/dns/update/id/".$id);
-	my $r = $lwp->post ( $hetzner."/dns/update",
-		[
-			'id' => $id,
-			'zonefile' => $zoneescaped,
+    my $r = $lwp->post ( $hetzner."/dns/update",
+        [
+            'id' => $id,
+            'zonefile' => $zoneescaped,
             '_csrf_token' => $csrf,
-		],
-		"Content-Type" => 'application/x-www-form-urlencoded; charset=UTF-8',
-		Referrer => $hetzner."/dns",
-		"X-Requested-With" => "XMLHttpRequest",
-		"X-Prototype-Version" => "1.6.1");
+        ],
+        "Content-Type" => 'application/x-www-form-urlencoded; charset=UTF-8',
+        Referrer => $hetzner."/dns",
+        "X-Requested-With" => "XMLHttpRequest",
+        "X-Prototype-Version" => "1.6.1");
 
-	# TODO: Potentially unsafe - first thing to look at if setzone() fails
-	if ($r->content !~ /The\ DNS\ entry\ will\ be\ updated\ now/) {
-		#print "DEBUG: ".$r->headers_as_string."\n----\n";
-		#print "DEBUG: ".$r->content."\n";
-		mydie("Updating zone ".$id." failed. Hetzner said: ".$r->code);
-	} else {
-		return 0;
-	}
+    # TODO: Potentially unsafe - first thing to look at if setzone() fails
+    if ($r->content !~ /The\ DNS\ entry\ will\ be\ updated\ now/) {
+        #print "DEBUG: ".$r->headers_as_string."\n----\n";
+        #print "DEBUG: ".$r->content."\n";
+        mydie("Updating zone ".$id." failed. Hetzner said: ".$r->code);
+    } else {
+        return 0;
+    }
 }
 if (login()) {
-	mydie("Was not able to login to Hetzner!");
+    mydie("Was not able to login to Hetzner!");
 }
 if (!$zonefile) {
-	my @zone = getzone($domainid);
-	my $zonefilename = $domainid.".db";
-	open ZONE, '>./'.$zonefilename or die "error opening $zonefilename for writing: $!";
-	print ZONE @zone;
-	close ZONE;
-	print "$zonefilename\n";
+    my @zone = getzone($domainid);
+    my $zonefilename = $domainid.".db";
+    open ZONE, '>./'.$zonefilename or die "error opening $zonefilename for writing: $!";
+    print ZONE @zone;
+    close ZONE;
+    print "$zonefilename\n";
 } else {
-	open ZONE, '<./'.$zonefile or die "error opening $zonefile for reading: $!";
-	my @zonecontents = <ZONE>;
-	setzone($domainid, @zonecontents);
-	close ZONE;
+    open ZONE, '<./'.$zonefile or die "error opening $zonefile for reading: $!";
+    my @zonecontents = <ZONE>;
+    setzone($domainid, @zonecontents);
+    close ZONE;
 }
