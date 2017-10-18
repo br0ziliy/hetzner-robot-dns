@@ -14,6 +14,11 @@ use URI::Escape;
 use Term::ReadKey;
 use Crypt::SSLeay;
 use HTML::Entities;
+use warnings;
+
+# Generate a random string for PHPSessionID
+my @set = ('0' ..'9', 'A' .. 'F');
+my $phpsess = join '' => map $set[rand @set], 1 .. 32;
 
 # Initialize /browser/
 my $lwp = LWP::UserAgent->new();
@@ -22,7 +27,8 @@ $lwp->cookie_jar({});
 $lwp->timeout("10");
 
 # Basic variables
-my $hetzner = "https://robot.your-server.de";
+my $hetzner = "https://accounts.hetzner.com";
+my $hetzner2 = "https://robot.your-server.de";
 my ($user, $pass, $domainid, $zonefile);
 
 # Parsing command line options
@@ -60,15 +66,14 @@ sub login {
     }
     #print "DEBUG: $user $pass \n";
 
-    # Cookie header - is just some MD5 hash, could be anything at the 
+    # Cookie header - is just some MD5 hash, could be anything at the
     # beginning. Looks like Hetzner expect this cookie to be always set...
-    my $r = $lwp->post( $hetzner."/login/check",
+    my $r = $lwp->post( $hetzner."/login_check",
             [
-            'user' => $user,
-            'password' => $pass,
+            '_username' => $user,
+            '_password' => $pass,
             ],
-            'Referer' => $hetzner."/login",
-            'Cookie' => "robot=2006fe366a925c478835fbfae197fc75",
+             'Cookie' => "PHPSESSID=".$phpsess.";"
     );
     undef $pass;
     #print "DEBUG: ".$r->code."\n";
@@ -76,9 +81,10 @@ sub login {
 
     # TODO: Potentially unsafe - but I don't know other method to realibly detect
     # a successful login.
-    if ($r->code != 302 && $r->header('Location') ne 'https://robot.your-server.de/') {
+    if ($r->code != 302 && $r->header('Location') ne $hetzner.'/') {
         return 1;
     } else {
+my $r1 = $lwp->get( $hetzner2 );
         return 0;
     }
 }
@@ -86,7 +92,7 @@ sub login {
 sub getcsrf {
        my $url = shift;
        my $r = $lwp->post ($url);
-       #print "DEBUG: ".$r->content."\n";
+      # print "DEBUG2: ".$r->content."\n";
        if ($r->content =~ /name="_csrf_token"\s+value="([a-f0-9]+)"/) {
                #print "DEBUG: CSRF token - " . $1;
                return $1;
@@ -102,9 +108,9 @@ sub getzone {
     if (!$zoneid) {
         mydie("Zone ID is required!");
     }
-    my $r = $lwp->post( $hetzner."/dns/update/id/".$zoneid,
+    my $r = $lwp->post( $hetzner2."/dns/update/id/".$zoneid,
         [],
-        Referrer => $hetzner."/dns");
+        Referrer => $hetzner2."/dns");
     my $html = $r->content;
 
     # TODO: Potentially unsafe regexp - but what can we do ...
@@ -127,24 +133,25 @@ sub setzone {
 
     # X- headers should be there probably - without these guys
     # Hetzner just ignore the POST request.
-    my $csrf = getcsrf($hetzner."/dns/update/id/".$id);
-    my $r = $lwp->post ( $hetzner."/dns/update",
+    my $csrf = getcsrf($hetzner2."/dns/update/id/".$id);
+    my $r = $lwp->post ( $hetzner2."/dns/update",
         [
             'id' => $id,
             'zonefile' => $zoneescaped,
             '_csrf_token' => $csrf,
         ],
         "Content-Type" => 'application/x-www-form-urlencoded; charset=UTF-8',
-        Referrer => $hetzner."/dns",
+        Referrer => $hetzner2."/dns",
         "X-Requested-With" => "XMLHttpRequest",
         "X-Prototype-Version" => "1.6.1");
 
     # TODO: Potentially unsafe - first thing to look at if setzone() fails
-    if ($r->content !~ /The\ DNS\ entry\ will\ be\ updated\ now/) {
+    if ($r->content !~ /The\ DNS\ entry\ will\ be\ updated\ now/ && $r->content !~ /Der\ DNS-Eintrag\ wird\ nun\ ge/ ) {
         #print "DEBUG: ".$r->headers_as_string."\n----\n";
         #print "DEBUG: ".$r->content."\n";
         mydie("Updating zone ".$id." failed. Hetzner said: ".$r->code);
     } else {
+        print "UPDATING zone ".$id." successful.\n";
         return 0;
     }
 }
@@ -159,7 +166,7 @@ if (!$zonefile) {
     close ZONE;
     print "$zonefilename\n";
 } else {
-    open ZONE, '<./'.$zonefile or die "error opening $zonefile for reading: $!";
+    open ZONE, '<'.$zonefile or die "error opening $zonefile for reading: $!";
     my @zonecontents = <ZONE>;
     setzone($domainid, @zonecontents);
     close ZONE;
