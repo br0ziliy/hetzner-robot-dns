@@ -14,9 +14,9 @@ use URI::Escape;
 use Term::ReadKey;
 use Crypt::SSLeay;
 use HTML::Entities;
-
-use strict;
 use warnings;
+
+# Generate a random string for PHPSessionID
 my @set = ('0' ..'9', 'A' .. 'F');
 my $phpsess = join '' => map $set[rand @set], 1 .. 32;
 
